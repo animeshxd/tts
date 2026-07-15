@@ -4,4 +4,24 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "torch",
+    "kittentts @ git+https://github.com/KittenML/KittenTTS@9f3e0d8b6600b56ebe1b4d7b6d8e1e020077d1f2",
+    "pandas==3.0.3",
+    "pyalsaaudio==0.11.0",
+    "pygobject==3.56.3",
+]
+
+[dependency-groups]
+dev = [
+    "kagglehub==1.0.2",
+    "wordfreq==3.1.1",
+]
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
