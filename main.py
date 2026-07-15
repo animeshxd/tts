@@ -146,7 +146,7 @@ def run_gui(args):
             Gtk4LayerShell.set_namespace(window, "tts-overlay")
             
             # Layer and keyboard
-            Gtk4LayerShell.set_layer(window, Gtk4LayerShell.Layer.TOP)
+            Gtk4LayerShell.set_layer(window, Gtk4LayerShell.Layer.OVERLAY)
             Gtk4LayerShell.set_keyboard_mode(window, Gtk4LayerShell.KeyboardMode.ON_DEMAND)
             
             # Anchors
