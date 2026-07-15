@@ -8,10 +8,16 @@ import re
 
 SOCKET_PATH = "/tmp/tts_daemon.sock"
 
+def load_tts_model():
+    from kittentts import KittenTTS
+    return KittenTTS("KittenML/kitten-tts-nano-0.8")
+
 def parse_args():
     parser = argparse.ArgumentParser(description="GTK4 TTS Overlay")
     parser.add_argument("-d", "--daemon", action="store_true", help="Run the TTS daemon")
     parser.add_argument("--device", type=str, default="pipewire", help="ALSA sound device to use (e.g. pipewire, pulse, default)")
+    parser.add_argument("--voice", type=str, default="Rosie", help="Voice to use for TTS (default: Rosie)")
+    parser.add_argument("--list-voices", action="store_true", help="List available voices and exit")
     
     # GUI config
     parser.add_argument("--anchor-top", action="store_true", default=True, help="Anchor to top edge (default: True)")
@@ -27,10 +33,22 @@ def parse_args():
     
     return parser.parse_args()
 
-def tts_worker(text_queue, device, voice = "Hugo"):
-    from kittentts import KittenTTS, normalize_text
+def list_voices():
+    print("Loading model to fetch available voices...")
+    model = load_tts_model()
+    voices = getattr(model, 'available_voices', [])
+    if voices:
+        print("\nAvailable voices:")
+        for v in voices:
+            print(f" - {v}")
+    else:
+        print("\nNo voices found or 'available_voices' property not present.")
+
+def tts_worker(text_queue, device, voice):
+    from kittentts import normalize_text
     import alsaaudio
     from load_clean_save import load_clean_json
+    
     pcm = alsaaudio.PCM(
         type=alsaaudio.PCM_PLAYBACK,
         device=device,
@@ -39,7 +57,7 @@ def tts_worker(text_queue, device, voice = "Hugo"):
         format=alsaaudio.PCM_FORMAT_FLOAT_LE,
     )
     print("Loading TTS model...")
-    model = KittenTTS("KittenML/kitten-tts-nano-0.8")
+    model = load_tts_model()
     lookup = load_clean_json()
     
     pattern = '[a-zA-Z0-9]+'
@@ -64,7 +82,7 @@ def tts_worker(text_queue, device, voice = "Hugo"):
         print(f"task done: {text}")
         text_queue.task_done()
 
-def run_daemon(device):
+def run_daemon(device, voice):
     if os.path.exists(SOCKET_PATH):
         try:
             # Check if it's a dead socket
@@ -77,7 +95,7 @@ def run_daemon(device):
             os.remove(SOCKET_PATH)
     
     text_queue = queue.Queue()
-    worker = threading.Thread(target=tts_worker, args=(text_queue, device), daemon=True)
+    worker = threading.Thread(target=tts_worker, args=(text_queue, device, voice), daemon=True)
     worker.start()
     
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -226,8 +244,13 @@ def run_gui(args):
 
 def main():
     args = parse_args()
+    
+    if args.list_voices:
+        list_voices()
+        sys.exit(0)
+        
     if args.daemon:
-        run_daemon(args.device)
+        run_daemon(args.device, args.voice)
     else:
         run_gui(args)
 
