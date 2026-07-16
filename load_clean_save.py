@@ -118,6 +118,10 @@ def clean_and_save(data):
 
 
 def load_clean_json(path=slang_clean_path):
+    if not os.path.exists(path):
+        import warnings
+        warnings.warn(f"Slang dataset not found at {path}. Returning empty dictionary. Run `python load_clean_save.py` to populate it.")
+        return {}
     return pd.read_json(path, orient="index", typ="series")
 
 
