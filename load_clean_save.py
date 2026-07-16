@@ -78,6 +78,7 @@ OVERRIDE = {
     "rm": "remove",
     "cp": "copy",
     "mv": "move",
+    "rn": "right now",
 }
 
 
