@@ -25,11 +25,22 @@ Before running, you must install the following system-level packages depending o
 
 ### Python Dependencies
 
-Make sure you have the required Python packages installed (such as PyGObject, Gtk4LayerShell, and pyalsaaudio).
+This project uses `uv` for fast dependency management, as defined in `pyproject.toml`. 
 
-If you are using a Python virtual environment:
+To easily set up a virtual environment and install all required Python packages (such as PyGObject, Gtk4LayerShell, and pyalsaaudio), simply run:
+```bash
+uv venv
+uv sync
+```
+
+Then, activate the virtual environment:
 ```bash
 source .venv/bin/activate
+```
+
+Before running the TTS daemon for the first time, you can optionally populate the chat abbreviation/slang dataset:
+```bash
+python load_clean_save.py
 ```
 
 ## Usage
