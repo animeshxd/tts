@@ -24,23 +24,16 @@ ZIPF_THRESHOLD = 3.0
 KEEP = {
     "lol",
     "lmao",
-    "rofl",
     "afk",
     "brb",
     "bro",
     "vro",
     "bruh",
-    "imo",
-    "imho",
     "ngl",
     "irl",
     "gg",
     "ez",
     "sus",
-    "ikr",
-    "rn",
-    "tbh",
-    "yw",
 }
 
 REMOVE = {
