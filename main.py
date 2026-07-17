@@ -88,6 +88,12 @@ def tts_worker(text_queue, device, voice):
             print(f"Error playing audio: {e}")
         print(f"task done: {text}")
         text_queue.task_done()
+        
+    print("Closing PCM device...")
+    try:
+        pcm.close()
+    except Exception as e:
+        print(f"Error closing PCM: {e}")
 
 def run_daemon(device, voice):
     if os.path.exists(SOCKET_PATH):
@@ -122,6 +128,9 @@ def run_daemon(device, voice):
     except KeyboardInterrupt:
         print("Shutting down daemon...")
     finally:
+        print("Sending shutdown signal to worker...")
+        text_queue.put(None)
+        worker.join(timeout=2.0)
         if os.path.exists(SOCKET_PATH):
             os.remove(SOCKET_PATH)
 
