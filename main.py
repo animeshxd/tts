@@ -73,7 +73,14 @@ def tts_worker(text_queue, device, voice):
         print(f"Speaking: {text}")
         normalized = advance_normalize_text(text, lookup)
         try:
+            import time
+            start_time = time.time()
+            first_chunk = True
             for audio in model.generate_stream(normalized, voice=voice, speed=1.3):
+                if first_chunk:
+                    diff = time.time() - start_time
+                    print(f"Time to first audio chunk: {diff:.3f}s")
+                    first_chunk = False
                 pcm.write(audio.squeeze().tobytes())
             pcm.drain()
             # pcm.close()
