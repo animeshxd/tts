@@ -21,21 +21,6 @@ def load_raw_json():
 
 ZIPF_THRESHOLD = 3.0
 
-KEEP = {
-    "lol",
-    "lmao",
-    "afk",
-    "brb",
-    "bro",
-    "vro",
-    "bruh",
-    "ngl",
-    "irl",
-    "gg",
-    "ez",
-    "sus",
-}
-
 REMOVE = {
     "bmw",
     "amd",
@@ -51,6 +36,18 @@ REMOVE = {
     "km",
     "cm",
     "mm",
+    "lol",
+    "lmao",
+    "afk",
+    "brb",
+    "bro",
+    "vro",
+    "bruh",
+    "ngl",
+    "irl",
+    "gg",
+    "ez",
+    "sus",
 }
 
 OVERRIDE = {
@@ -88,10 +85,6 @@ def clean_and_save(data):
     for word, value in data.items():
         w = word.strip().lower()
         freq = zipf_frequency(w, "en")
-
-        if w in KEEP:
-            kept[word] = value
-            continue
 
         if w in REMOVE:
             removed[word] = value
