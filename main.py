@@ -1,10 +1,10 @@
-import sys
-import os
 import argparse
-import socket
-import threading
+import os
 import queue
 import re
+import socket
+import sys
+import threading
 
 SOCKET_PATH = "/tmp/tts_daemon.sock"
 
@@ -45,8 +45,9 @@ def list_voices():
         print("\nNo voices found or 'available_voices' property not present.")
 
 def tts_worker(text_queue, device, voice):
-    from kittentts import normalize_text
     import alsaaudio
+    from kittentts import normalize_text
+
     from load_clean_save import load_clean_json
     
     pcm = alsaaudio.PCM(
@@ -82,7 +83,7 @@ def tts_worker(text_queue, device, voice):
                     print(f"Time to first audio chunk: {diff:.3f}s")
                     first_chunk = False
                 pcm.write(audio.squeeze().tobytes())
-            pcm.drain()
+                pcm.drain()
             # pcm.close()
         except Exception as e:
             print(f"Error playing audio: {e}")
@@ -149,7 +150,7 @@ def run_gui(args):
     import gi
     gi.require_version('Gtk', '4.0')
     gi.require_version('Gtk4LayerShell', '1.0')
-    from gi.repository import Gtk, Gtk4LayerShell, Gdk
+    from gi.repository import Gdk, Gtk, Gtk4LayerShell
 
     class TTSApp(Gtk.Application):
         def __init__(self, args):
