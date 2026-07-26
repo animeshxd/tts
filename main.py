@@ -18,7 +18,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="GTK4 TTS Overlay")
     parser.add_argument("-d", "--daemon", action="store_true", help="Run the TTS daemon")
     parser.add_argument("--device", type=str, default="pipewire", help="ALSA sound device to use (e.g. pipewire, pulse, default)")
-    parser.add_argument("--voice", type=str, default="cosette", help="Voice to use for TTS (default: Rosie)")
+    parser.add_argument("--voice", type=str, default="cosette", help="Voice to use for TTS (default: cosette)")
     parser.add_argument("--list-voices", action="store_true", help="List available voices and exit")
 
     # GUI config
