@@ -9,28 +9,30 @@ import threading
 SOCKET_PATH = "/tmp/tts_daemon.sock"
 
 def load_tts_model():
-    from kittentts import KittenTTS
-    return KittenTTS("KittenML/kitten-tts-nano-0.8")
+    from pocket_tts import TTSModel
+    return TTSModel.load_model(
+        language='english',
+    )
 
 def parse_args():
     parser = argparse.ArgumentParser(description="GTK4 TTS Overlay")
     parser.add_argument("-d", "--daemon", action="store_true", help="Run the TTS daemon")
     parser.add_argument("--device", type=str, default="pipewire", help="ALSA sound device to use (e.g. pipewire, pulse, default)")
-    parser.add_argument("--voice", type=str, default="Rosie", help="Voice to use for TTS (default: Rosie)")
+    parser.add_argument("--voice", type=str, default="cosette", help="Voice to use for TTS (default: Rosie)")
     parser.add_argument("--list-voices", action="store_true", help="List available voices and exit")
-    
+
     # GUI config
     parser.add_argument("--anchor-top", action="store_true", default=True, help="Anchor to top edge (default: True)")
     parser.add_argument("--no-anchor-top", action="store_false", dest="anchor_top", help="Do not anchor to top edge")
     parser.add_argument("--anchor-bottom", action="store_true", help="Anchor to bottom edge")
     parser.add_argument("--anchor-left", action="store_true", help="Anchor to left edge")
     parser.add_argument("--anchor-right", action="store_true", help="Anchor to right edge")
-    
+
     parser.add_argument("--margin-top", type=int, default=10, help="Top margin in pixels (default: 10)")
     parser.add_argument("--margin-bottom", type=int, default=0, help="Bottom margin in pixels")
     parser.add_argument("--margin-left", type=int, default=0, help="Left margin in pixels")
     parser.add_argument("--margin-right", type=int, default=0, help="Right margin in pixels")
-    
+
     return parser.parse_args()
 
 def list_voices():
@@ -46,10 +48,9 @@ def list_voices():
 
 def tts_worker(text_queue, device, voice):
     import alsaaudio
-    from kittentts import normalize_text
 
     from load_clean_save import load_clean_json
-    
+
     pcm = alsaaudio.PCM(
         type=alsaaudio.PCM_PLAYBACK,
         device=device,
@@ -59,12 +60,15 @@ def tts_worker(text_queue, device, voice):
     )
     print("Loading TTS model...")
     model = load_tts_model()
+    voice_state = model.get_state_for_audio_prompt(
+        voice
+    )
     lookup = load_clean_json()
-    
+
     pattern = '[a-zA-Z0-9]+'
     def advance_normalize_text(text, lookup) -> str:
-        normalized = normalize_text(text)
-        return re.sub(pattern, lambda match: lookup.get(match.group(), match.group()), normalized)
+        # normalized = normalize_text(text)
+        return re.sub(pattern, lambda match: lookup.get(match.group(), match.group()), text)
 
     print("TTS daemon ready to speak.")
     while True:
@@ -77,19 +81,19 @@ def tts_worker(text_queue, device, voice):
             import time
             start_time = time.time()
             first_chunk = True
-            for audio in model.generate_stream(normalized, voice=voice, speed=1.3):
+            for audio in model.generate_audio_stream(voice_state, normalized):
                 if first_chunk:
                     diff = time.time() - start_time
                     print(f"Time to first audio chunk: {diff:.3f}s")
                     first_chunk = False
-                pcm.write(audio.squeeze().tobytes())
+                pcm.write(audio.numpy().tobytes())
                 pcm.drain()
             # pcm.close()
         except Exception as e:
             print(f"Error playing audio: {e}")
         print(f"task done: {text}")
         text_queue.task_done()
-        
+
     print("Closing PCM device...")
     try:
         pcm.close()
@@ -107,15 +111,15 @@ def run_daemon(device, voice):
             sys.exit(1)
         except ConnectionRefusedError:
             os.remove(SOCKET_PATH)
-    
+
     text_queue = queue.Queue()
     worker = threading.Thread(target=tts_worker, args=(text_queue, device, voice), daemon=True)
     worker.start()
-    
+
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     server.bind(SOCKET_PATH)
     server.listen()
-    
+
     print(f"Daemon listening on {SOCKET_PATH}")
     try:
         while True:
@@ -161,11 +165,11 @@ def run_gui(args):
             window = Gtk.ApplicationWindow(application=self, title="TTS Overlay")
             Gtk4LayerShell.init_for_window(window)
             Gtk4LayerShell.set_namespace(window, "tts-overlay")
-            
+
             # Layer and keyboard
             Gtk4LayerShell.set_layer(window, Gtk4LayerShell.Layer.OVERLAY)
             Gtk4LayerShell.set_keyboard_mode(window, Gtk4LayerShell.KeyboardMode.ON_DEMAND)
-            
+
             # Anchors
             anchors = {
                 Gtk4LayerShell.Edge.TOP: self.args.anchor_top,
@@ -178,31 +182,31 @@ def run_gui(args):
                 if enabled:
                     Gtk4LayerShell.set_anchor(window, edge, True)
                     has_anchor = True
-                    
+
             if not has_anchor:
                 Gtk4LayerShell.set_anchor(window, Gtk4LayerShell.Edge.TOP, True)
-                
+
             # Margins
             Gtk4LayerShell.set_margin(window, Gtk4LayerShell.Edge.TOP, self.args.margin_top)
             Gtk4LayerShell.set_margin(window, Gtk4LayerShell.Edge.BOTTOM, self.args.margin_bottom)
             Gtk4LayerShell.set_margin(window, Gtk4LayerShell.Edge.LEFT, self.args.margin_left)
             Gtk4LayerShell.set_margin(window, Gtk4LayerShell.Edge.RIGHT, self.args.margin_right)
-            
+
             # UI
             box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             box.set_margin_top(12)
             box.set_margin_bottom(12)
             box.set_margin_start(12)
             box.set_margin_end(12)
-            
+
             self.entry = Gtk.Entry()
             self.entry.set_placeholder_text("Type to speak... (Esc to quit)")
             self.entry.set_width_chars(40)
             self.entry.connect("activate", self.on_enter_pressed)
-            
+
             box.append(self.entry)
             window.set_child(box)
-            
+
             # CSS Styling
             provider = Gtk.CssProvider()
             provider.load_from_data(b"""
@@ -225,8 +229,8 @@ def run_gui(args):
             }
             """)
             Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(), 
-                provider, 
+                Gdk.Display.get_default(),
+                provider,
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             )
 
@@ -261,11 +265,11 @@ def run_gui(args):
 
 def main():
     args = parse_args()
-    
+
     if args.list_voices:
         list_voices()
         sys.exit(0)
-        
+
     if args.daemon:
         run_daemon(args.device, args.voice)
     else:
