@@ -3,6 +3,7 @@ import os
 import queue
 import re
 import socket
+import subprocess
 import sys
 import threading
 
@@ -17,6 +18,7 @@ def parse_args():
     parser.add_argument("-d", "--daemon", action="store_true", help="Run the TTS daemon")
     parser.add_argument("--device", type=str, default="pipewire", help="ALSA sound device to use (e.g. pipewire, pulse, default)")
     parser.add_argument("--voice", type=str, default="Rosie", help="Voice to use for TTS (default: Rosie)")
+    parser.add_argument("--virtual", action="store_true", help="Start TTS on a virtual null PulseAudio sink and unload it on close")
     parser.add_argument("--list-voices", action="store_true", help="List available voices and exit")
     
     # GUI config
@@ -96,7 +98,21 @@ def tts_worker(text_queue, device, voice):
     except Exception as e:
         print(f"Error closing PCM: {e}")
 
-def run_daemon(device, voice):
+def run_daemon(device, voice, virtual=False):
+    module_id = None
+    if virtual:
+        try:
+            res = subprocess.run(
+                ["pactl", "load-module", "module-null-sink", "sink_name=TTS_Virtual_Sink", "sink_properties=device.description=TTS_Virtual_Sink"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            module_id = res.stdout.strip()
+            print(f"Loaded virtual null sink 'TTS_Virtual_Sink' (module ID: {module_id})")
+        except Exception as e:
+            print(f"Error loading virtual null sink: {e}")
+
     if os.path.exists(SOCKET_PATH):
         try:
             # Check if it's a dead socket
@@ -104,6 +120,8 @@ def run_daemon(device, voice):
             client.connect(SOCKET_PATH)
             client.close()
             print("Daemon is already running.")
+            if module_id:
+                subprocess.run(["pactl", "unload-module", module_id], check=False)
             sys.exit(1)
         except ConnectionRefusedError:
             os.remove(SOCKET_PATH)
@@ -134,6 +152,12 @@ def run_daemon(device, voice):
         worker.join(timeout=2.0)
         if os.path.exists(SOCKET_PATH):
             os.remove(SOCKET_PATH)
+        if module_id:
+            try:
+                subprocess.run(["pactl", "unload-module", module_id], check=False)
+                print(f"Unloaded virtual null sink (module ID: {module_id})")
+            except Exception as e:
+                print(f"Error unloading virtual sink: {e}")
 
 def run_gui(args):
     # Check if daemon is running
@@ -267,7 +291,7 @@ def main():
         sys.exit(0)
         
     if args.daemon:
-        run_daemon(args.device, args.voice)
+        run_daemon(args.device, args.voice, args.virtual)
     else:
         run_gui(args)
 
