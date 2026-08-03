@@ -58,11 +58,12 @@ python main.py -d
 **Daemon Options:**
 - `--device <name>`: Specify the ALSA playback device (e.g., `pipewire`, `pulse`, `default`). Defaults to `pipewire`.
 - `--voice <name>`: Choose the TTS voice. Defaults to `Rosie`.
-- `--virtual`: Automatically load a virtual null PulseAudio sink (`TTS_Virtual_Sink`) and route audio output to it, automatically unloading the module when the daemon exits.
+- `--virtual`: Automatically load a virtual null PulseAudio sink (`TTS_Virtual_Sink`) and route audio output to `pulse:TTS_Virtual_Sink`, automatically unloading the module when the daemon exits.
+- `--feedback`: Enables local audio feedback by creating a PulseAudio loopback module from `TTS_Virtual_Sink.monitor` to `@DEFAULT_SINK@` (implicitly enables `--virtual`).
 
 Example:
 ```bash
-python main.py -d --virtual --voice Hugo
+python main.py -d --virtual --feedback --voice Hugo
 ```
 
 ### 2. Launch the GUI Overlay

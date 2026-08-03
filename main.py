@@ -19,6 +19,7 @@ def parse_args():
     parser.add_argument("--device", type=str, default="pipewire", help="ALSA sound device to use (e.g. pipewire, pulse, default)")
     parser.add_argument("--voice", type=str, default="Rosie", help="Voice to use for TTS (default: Rosie)")
     parser.add_argument("--virtual", action="store_true", help="Start TTS on a virtual null PulseAudio sink and unload it on close")
+    parser.add_argument("--feedback", action="store_true", help="Enable audio feedback loopback from virtual sink monitor to default sink")
     parser.add_argument("--list-voices", action="store_true", help="List available voices and exit")
     
     # GUI config
@@ -98,9 +99,13 @@ def tts_worker(text_queue, device, voice):
     except Exception as e:
         print(f"Error closing PCM: {e}")
 
-def run_daemon(device, voice, virtual=False):
-    module_id = None
+def run_daemon(device, voice, virtual=False, feedback=False):
+    loaded_modules = []
+    if feedback:
+        virtual = True
+
     if virtual:
+        device = "pulse:TTS_Virtual_Sink"
         try:
             res = subprocess.run(
                 ["pactl", "load-module", "module-null-sink", "sink_name=TTS_Virtual_Sink", "sink_properties=device.description=TTS_Virtual_Sink"],
@@ -108,10 +113,25 @@ def run_daemon(device, voice, virtual=False):
                 text=True,
                 check=True
             )
-            module_id = res.stdout.strip()
-            print(f"Loaded virtual null sink 'TTS_Virtual_Sink' (module ID: {module_id})")
+            mod_id = res.stdout.strip()
+            loaded_modules.append(mod_id)
+            print(f"Loaded virtual null sink 'TTS_Virtual_Sink' (module ID: {mod_id})")
         except Exception as e:
             print(f"Error loading virtual null sink: {e}")
+
+    if feedback:
+        try:
+            res = subprocess.run(
+                ["pactl", "load-module", "module-loopback", "source=TTS_Virtual_Sink.monitor", "sink=@DEFAULT_SINK@"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            mod_id = res.stdout.strip()
+            loaded_modules.append(mod_id)
+            print(f"Loaded loopback feedback module (module ID: {mod_id})")
+        except Exception as e:
+            print(f"Error loading loopback feedback module: {e}")
 
     if os.path.exists(SOCKET_PATH):
         try:
@@ -120,8 +140,8 @@ def run_daemon(device, voice, virtual=False):
             client.connect(SOCKET_PATH)
             client.close()
             print("Daemon is already running.")
-            if module_id:
-                subprocess.run(["pactl", "unload-module", module_id], check=False)
+            for mod_id in reversed(loaded_modules):
+                subprocess.run(["pactl", "unload-module", mod_id], check=False)
             sys.exit(1)
         except ConnectionRefusedError:
             os.remove(SOCKET_PATH)
@@ -152,12 +172,12 @@ def run_daemon(device, voice, virtual=False):
         worker.join(timeout=2.0)
         if os.path.exists(SOCKET_PATH):
             os.remove(SOCKET_PATH)
-        if module_id:
+        for mod_id in reversed(loaded_modules):
             try:
-                subprocess.run(["pactl", "unload-module", module_id], check=False)
-                print(f"Unloaded virtual null sink (module ID: {module_id})")
+                subprocess.run(["pactl", "unload-module", mod_id], check=False)
+                print(f"Unloaded module (ID: {mod_id})")
             except Exception as e:
-                print(f"Error unloading virtual sink: {e}")
+                print(f"Error unloading module {mod_id}: {e}")
 
 def run_gui(args):
     # Check if daemon is running
@@ -291,7 +311,7 @@ def main():
         sys.exit(0)
         
     if args.daemon:
-        run_daemon(args.device, args.voice, args.virtual)
+        run_daemon(args.device, args.voice, args.virtual, args.feedback)
     else:
         run_gui(args)
 
