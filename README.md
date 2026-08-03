@@ -8,6 +8,7 @@ A sleek, lightweight GTK4 Layer Shell overlay and background daemon that provide
 
 - **Instant & Seamless**: The background daemon keeps the AI model loaded in memory for zero-latency speech generation.
 - **Always on Top**: Built with GTK4 Layer Shell to sit gracefully on top of all your windows (like a launcher or panel).
+- **Zsh-Style Inline Autocomplete**: Fast, context-aware suggestions drawn from your persistent command history rendered as ghost text.
 - **Highly Configurable**: Change ALSA playback devices, select different voices, and configure window anchors and margins.
 - **Unix Domain Sockets**: Fast, local, and reliable IPC between the GUI and the background audio service.
 
@@ -90,5 +91,6 @@ python main.py --list-voices
 
 ## How to use the Overlay
 - **Type text**: Type the phrase you want to be spoken.
-- **Enter**: Sends the text to the daemon to be spoken immediately and clears the text box so you can keep typing.
+- **Tab**: Accepts the inline gray autocomplete suggestion.
+- **Enter**: Sends the text to the daemon to be spoken immediately, saves it to history, and clears the text box.
 - **Esc**: Closes the overlay.

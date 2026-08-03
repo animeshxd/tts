@@ -194,12 +194,63 @@ def run_gui(args):
     import gi
     gi.require_version('Gtk', '4.0')
     gi.require_version('Gtk4LayerShell', '1.0')
-    from gi.repository import Gdk, Gtk, Gtk4LayerShell
+    from gi.repository import Gdk, GLib, Gtk, Gtk4LayerShell
+
+    class HistoryManager:
+        def __init__(self, file_path=None, max_size=1000):
+            if file_path is None:
+                application_dir = os.path.dirname(os.path.abspath(__file__))
+                self.file_path = os.path.join(application_dir, "history.txt")
+            else:
+                self.file_path = file_path
+            self.max_size = max_size
+            self.history = []
+            self.load()
+
+        def load(self):
+            if os.path.exists(self.file_path):
+                try:
+                    with open(self.file_path, "r", encoding="utf-8") as f:
+                        lines = [line.rstrip("\r\n") for line in f if line.strip()]
+                        self.history = lines[-self.max_size:]
+                except Exception as e:
+                    print(f"Error loading history: {e}")
+
+        def save(self):
+            try:
+                os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+                with open(self.file_path, "w", encoding="utf-8") as f:
+                    f.writelines(f"{item}\n" for item in self.history)
+            except Exception as e:
+                print(f"Error saving history: {e}")
+
+        def add(self, text):
+            text = text.strip()
+            if not text:
+                return
+            if self.history and self.history[-1] == text:
+                return
+            if text in self.history:
+                self.history.remove(text)
+            self.history.append(text)
+            if len(self.history) > self.max_size:
+                self.history = self.history[-self.max_size:]
+            self.save()
+
+        def find_completion(self, prefix):
+            if not prefix:
+                return None
+            for item in reversed(self.history):
+                if item.startswith(prefix) and item != prefix:
+                    return item[len(prefix):]
+            return None
 
     class TTSApp(Gtk.Application):
         def __init__(self, args):
             super().__init__(application_id='com.example.TTSOverlay', flags=gi.repository.Gio.ApplicationFlags.FLAGS_NONE)
             self.args = args
+            self.history_manager = HistoryManager()
+            self.current_completion = ""
 
         def do_activate(self):
             window = Gtk.ApplicationWindow(application=self, title="TTS Overlay")
@@ -239,12 +290,36 @@ def run_gui(args):
             box.set_margin_start(12)
             box.set_margin_end(12)
             
+            overlay = Gtk.Overlay()
+
             self.entry = Gtk.Entry()
             self.entry.set_placeholder_text("Type to speak... (Esc to quit)")
             self.entry.set_width_chars(40)
             self.entry.connect("activate", self.on_enter_pressed)
+            self.entry.connect("changed", self.on_entry_changed)
+            self.entry.connect("notify::cursor-position", self.on_cursor_moved)
             
-            box.append(self.entry)
+            completion_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            completion_box.set_can_target(False)
+            completion_box.set_valign(Gtk.Align.CENTER)
+            completion_box.set_halign(Gtk.Align.START)
+            completion_box.add_css_class("completion-box")
+
+            self.lbl_prefix = Gtk.Label()
+            self.lbl_prefix.add_css_class("completion-prefix")
+
+            self.lbl_suffix = Gtk.Label()
+            self.lbl_suffix.add_css_class("completion-suffix")
+
+            completion_box.append(self.lbl_prefix)
+            completion_box.append(self.lbl_suffix)
+            completion_box.set_visible(False)
+            self.completion_box = completion_box
+
+            overlay.set_child(self.entry)
+            overlay.add_overlay(completion_box)
+
+            box.append(overlay)
             window.set_child(box)
             
             # CSS Styling
@@ -267,6 +342,21 @@ def run_gui(args):
                 border-color: #3584e4;
                 box-shadow: 0 0 0 2px rgba(53, 132, 228, 0.5);
             }
+            .completion-box {
+                margin-left: 13px;
+            }
+            .completion-prefix {
+                color: transparent;
+                font-size: 16px;
+                padding: 0;
+                margin: 0;
+            }
+            .completion-suffix {
+                color: rgba(160, 160, 160, 0.65);
+                font-size: 16px;
+                padding: 0;
+                margin: 0;
+            }
             """)
             Gtk.StyleContext.add_provider_for_display(
                 Gdk.Display.get_default(), 
@@ -282,8 +372,38 @@ def run_gui(args):
             window.present()
             self.entry.grab_focus()
 
+        def update_completion(self):
+            typed_text = self.entry.get_text()
+            pos = self.entry.get_position()
+            if pos == len(typed_text) and typed_text:
+                suffix = self.history_manager.find_completion(typed_text)
+                if suffix:
+                    self.lbl_prefix.set_text(typed_text)
+                    self.lbl_suffix.set_text(suffix)
+                    self.completion_box.set_visible(True)
+                    self.current_completion = suffix
+                    return
+            self.lbl_prefix.set_text("")
+            self.lbl_suffix.set_text("")
+            self.completion_box.set_visible(False)
+            self.current_completion = ""
+
+        def on_entry_changed(self, entry):
+            self.update_completion()
+
+        def on_cursor_moved(self, entry, pspec):
+            self.update_completion()
+
         def on_key_pressed(self, controller, keyval, keycode, state):
-            if Gdk.keyval_name(keyval) == 'Escape':
+            key_name = Gdk.keyval_name(keyval)
+            if key_name in ('Tab', 'ISO_Left_Tab') and self.current_completion:
+                typed_text = self.entry.get_text()
+                new_text = typed_text + self.current_completion
+                self.entry.set_text(new_text)
+                self.entry.set_position(len(new_text))
+                self.update_completion()
+                return True
+            elif key_name == 'Escape':
                 self.quit()
                 return True
             return False
@@ -296,9 +416,11 @@ def run_gui(args):
                     client.connect(SOCKET_PATH)
                     client.sendall(text.encode('utf-8'))
                     client.close()
+                    self.history_manager.add(text)
                 except Exception as e:
                     print(f"Failed to send to daemon: {e}")
                 entry.set_text("")
+                self.update_completion()
 
     app = TTSApp(args)
     app.run(None)
