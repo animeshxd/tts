@@ -75,11 +75,11 @@ def tts_worker(text_queue, device, voice):
         if text is None:
             break
         print(f"Speaking: {text}")
-        normalized = advance_normalize_text(text, lookup)
         try:
             import time
             start_time = time.time()
             first_chunk = True
+            normalized = advance_normalize_text(text, lookup)
             for audio in model.generate_stream(normalized, voice=voice, speed=1.3):
                 if first_chunk:
                     diff = time.time() - start_time
