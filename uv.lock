@@ -655,12 +655,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pyalsaaudio"
-version = "0.11.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/21/a6/3d833079b030d449345e35ce0e2874e330d3612135734f07b9ceace25bcf/pyalsaaudio-0.11.0.tar.gz", hash = "sha256:a78a9dca33524b2c9064b34e21f5ab874272313cf324a9a77592f396a5e0fddc", size = 311152, upload-time = "2024-05-30T21:35:57.928Z" }
-
-[[package]]
 name = "pycairo"
 version = "1.29.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1039,7 +1033,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "kittentts" },
     { name = "pandas" },
-    { name = "pyalsaaudio" },
     { name = "pygobject" },
     { name = "torch", version = "2.13.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
@@ -1055,7 +1048,6 @@ dev = [
 requires-dist = [
     { name = "kittentts", git = "https://github.com/KittenML/KittenTTS?rev=9f3e0d8b6600b56ebe1b4d7b6d8e1e020077d1f2" },
     { name = "pandas", specifier = "==3.0.3" },
-    { name = "pyalsaaudio", specifier = "==0.11.0" },
     { name = "pygobject", specifier = "==3.56.3" },
     { name = "torch", index = "https://download.pytorch.org/whl/cpu" },
 ]

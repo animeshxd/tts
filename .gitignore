@@ -11,3 +11,5 @@ wheels/
 *.json
 *.wav
 .ipynb*
+.direnv
+history.txt

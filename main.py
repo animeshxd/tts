@@ -16,7 +16,7 @@ def load_tts_model():
 def parse_args():
     parser = argparse.ArgumentParser(description="GTK4 TTS Overlay")
     parser.add_argument("-d", "--daemon", action="store_true", help="Run the TTS daemon")
-    parser.add_argument("--device", type=str, default="pipewire", help="ALSA sound device to use (e.g. pipewire, pulse, default)")
+    parser.add_argument("--device", type=str, default=None, help="PulseAudio sink device name to use (default: None for default sink)")
     parser.add_argument("--voice", type=str, default="Rosie", help="Voice to use for TTS (default: Rosie)")
     parser.add_argument("--virtual", action="store_true", help="Start TTS on a virtual null PulseAudio sink and unload it on close")
     parser.add_argument("--feedback", action="store_true", help="Enable audio feedback loopback from virtual sink monitor to default sink")
@@ -48,17 +48,15 @@ def list_voices():
         print("\nNo voices found or 'available_voices' property not present.")
 
 def tts_worker(text_queue, device, voice):
-    import alsaaudio
+    from pulse_simple import PulseAudioPlayback
     from kittentts import normalize_text
 
     from load_clean_save import load_clean_json
     
-    pcm = alsaaudio.PCM(
-        type=alsaaudio.PCM_PLAYBACK,
+    pulse = PulseAudioPlayback(
         device=device,
         rate=24000,
         channels=1,
-        format=alsaaudio.PCM_FORMAT_FLOAT_LE,
     )
     print("Loading TTS model...")
     model = load_tts_model()
@@ -85,19 +83,19 @@ def tts_worker(text_queue, device, voice):
                     diff = time.time() - start_time
                     print(f"Time to first audio chunk: {diff:.3f}s")
                     first_chunk = False
-                pcm.write(audio.squeeze().tobytes())
-                pcm.drain()
-            # pcm.close()
+                pulse.write(audio.squeeze().tobytes())
+                pulse.drain()
+            # pulse.close()
         except Exception as e:
             print(f"Error playing audio: {e}")
         print(f"task done: {text}")
         text_queue.task_done()
         
-    print("Closing PCM device...")
+    print("Closing PulseAudio device...")
     try:
-        pcm.close()
+        pulse.close()
     except Exception as e:
-        print(f"Error closing PCM: {e}")
+        print(f"Error closing PulseAudio: {e}")
 
 def run_daemon(device, voice, virtual=False, feedback=False):
     loaded_modules = []
@@ -105,7 +103,7 @@ def run_daemon(device, voice, virtual=False, feedback=False):
         virtual = True
 
     if virtual:
-        device = "pulse:TTS_Virtual_Sink"
+        device = "TTS_Virtual_Sink"
         try:
             res = subprocess.run(
                 ["pactl", "load-module", "module-null-sink", "sink_name=TTS_Virtual_Sink", "sink_properties=device.description=TTS_Virtual_Sink"],
@@ -190,8 +188,11 @@ def run_gui(args):
         sys.exit(1)
 
     from ctypes import CDLL
-    CDLL('libgtk4-layer-shell.so')
+    import ctypes.util
+    lib = ctypes.util.find_library('libgtk4-layer-shell.so') or ctypes.util.find_library("gtk4-layer-shell")
+    CDLL(lib)
     import gi
+    gi.require_version('Gdk', '4.0')
     gi.require_version('Gtk', '4.0')
     gi.require_version('Gtk4LayerShell', '1.0')
     from gi.repository import Gdk, GLib, Gtk, Gtk4LayerShell

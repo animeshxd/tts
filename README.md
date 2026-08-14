@@ -9,18 +9,17 @@ A sleek, lightweight GTK4 Layer Shell overlay and background daemon that provide
 - **Instant & Seamless**: The background daemon keeps the AI model loaded in memory for zero-latency speech generation.
 - **Always on Top**: Built with GTK4 Layer Shell to sit gracefully on top of all your windows (like a launcher or panel).
 - **Zsh-Style Inline Autocomplete**: Fast, context-aware suggestions drawn from your persistent command history rendered as ghost text.
-- **Highly Configurable**: Change ALSA playback devices, select different voices, and configure window anchors and margins.
+- **Highly Configurable**: Select PulseAudio/PipeWire output sinks, choose different voices, and configure window anchors and margins.
 - **Unix Domain Sockets**: Fast, local, and reliable IPC between the GUI and the background audio service.
 
 ## Setup
 
-> **Note:** This application is **Linux-only**, as it relies on GTK4 Layer Shell (Wayland) and ALSA/PipeWire/PulseAudio for audio.
+> **Note:** This application is **Linux-only**, as it relies on GTK4 Layer Shell (Wayland) and PulseAudio/PipeWire for audio.
 
 ### System Dependencies
 
 Before running, you must install the following system-level packages depending on your Linux distribution:
-- `libasound` (ALSA library required for audio routing)
-- `alsa-plugins` (Crucial for PulseAudio/PipeWire compatibility, specifically for the `module-null-sink`)
+- `libpulse` / `libpulse-simple` (PulseAudio / PipeWire simple audio API library)
 - `gtk4` (The core UI toolkit)
 - `libgtk4-layer-shell` (Required for the overlay window on Wayland)
 
@@ -28,7 +27,7 @@ Before running, you must install the following system-level packages depending o
 
 This project uses `uv` for fast dependency management, as defined in `pyproject.toml`. 
 
-To easily set up a virtual environment and install all required Python packages (such as PyGObject, Gtk4LayerShell, and pyalsaaudio), simply run:
+To easily set up a virtual environment and install all required Python packages (such as PyGObject and Gtk4LayerShell), simply run:
 ```bash
 uv venv
 uv sync
@@ -57,9 +56,9 @@ python main.py -d
 ```
 
 **Daemon Options:**
-- `--device <name>`: Specify the ALSA playback device (e.g., `pipewire`, `pulse`, `default`). Defaults to `pipewire`.
+- `--device <name>`: Specify the PulseAudio sink name (e.g., specific sink name or leave default for system default sink).
 - `--voice <name>`: Choose the TTS voice. Defaults to `Rosie`.
-- `--virtual`: Automatically load a virtual null PulseAudio sink (`TTS_Virtual_Sink`) and route audio output to `pulse:TTS_Virtual_Sink`, automatically unloading the module when the daemon exits.
+- `--virtual`: Automatically load a virtual null PulseAudio sink (`TTS_Virtual_Sink`) and route audio output to `TTS_Virtual_Sink`, automatically unloading the module when the daemon exits.
 - `--feedback`: Enables local audio feedback by creating a PulseAudio loopback module from `TTS_Virtual_Sink.monitor` to `@DEFAULT_SINK@` (implicitly enables `--virtual`).
 
 Example:
